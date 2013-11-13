@@ -19,6 +19,7 @@ with OpenMWMM.  If not, see <http://www.gnu.org/licenses/>.
 import logging
 import os
 import shutil
+import sqlite3
 
 class DataDir( object ):
 
@@ -38,13 +39,27 @@ class DataDir( object ):
       self.path_data = os.path.join( self.path, 'data' )
       self.path_avail = os.path.join( self.path, 'mods' )
 
-      # TODO: Create ~/.config/openmw/data_avail for available mods.
+      # Create ~/.config/openmw/data_avail for available mods.
       if not os.path.isdir( self.path_data ):
          os.mkdir( self.path_data )
       if not os.path.isdir( self.path_avail ):
          os.mkdir( self.path_avail )
 
-      # TODO: Make sure valid hashed file for each mod is present.
+      self.database = sqlite3.connect( os.path.join( self.path, 'omwmm.db' ) )
+      try:
+         db_version = self.database.execute(
+            "SELECT value FROM system WHERE key = 'version'"
+         )
+      except sqlite3.OperationalError, e:
+         # No system table or version row, so create the database.
+         self._setup_database()
+
+   def _setup_database( self ):
+      self.database.execute( 'CREATE TABLE system (key text, value text)' )
+      self.database.execute(
+         '''CREATE TABLE files_installed
+         (mod_hash text, file_path text, ins_date text)'''
+      )
 
    def import_mod( self, mod_path ):
 
@@ -61,6 +76,9 @@ class DataDir( object ):
       return True
 
    def list_available( self ):
+
+      # TODO: Make sure valid hashed file for each mod is present.
+
       mods_out = []
       for entry in os.listdir( self.path_avail ):
          if self.validate_mod( os.path.join( self.path_avail, entry ) ):
@@ -79,10 +97,12 @@ class DataDir( object ):
 
       pass
 
-   def install_mod( self, mod_path ):
+   def install_mod( self, mod_path, force=False ):
       
       # TODO: For each file in the archive, check if it exists in the database
       #       and ask to remove existing copy if it does.
+
+      # TODO: Perform the actual installation in the second pass.
 
       pass
 
