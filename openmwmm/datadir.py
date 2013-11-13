@@ -23,6 +23,7 @@ import sqlite3
 import zipfile
 import rarfile
 import re
+import tempfile
 
 DATA_README_FILES = ['readme']
 DATA_DIR_VERSION = '1'
@@ -121,18 +122,28 @@ class DataDir( object ):
 
       return data_prefix
 
-   def _remove_file( self, file_path, mod_id ):
-      
-      # TODO: Remove this file from the database.
-
-      pass
-
    def _install_file( self, archive, file_path, mod_id, mod_data_path ):
 
       install_path = os.path.join(
          self.path_data, file_path[len( mod_data_path ) + 1:]
       )
-      
+
+      try:
+         os.makedirs( os.path.dirname( install_path ) )
+      except:
+         pass
+
+      # TODO: Actually extract the file.
+      try:
+         with archive.open( file_path ) as file_file:
+            with open( install_path, 'wb' ) as out_file:
+               shutil.copyfileobj( file_file, out_file )
+      except:
+         self.logger.error(
+            'Failed to install file: {}'.format( install_path )
+         )
+         return
+
       # Log the installation of this file in the database.
       self.database.execute(
          'INSERT INTO files_installed VALUES (?, ?, ?)',
@@ -141,7 +152,20 @@ class DataDir( object ):
 
       self.logger.info( 'Installed file: {}'.format( install_path ) )
 
-      # TODO: Actually extract the file.
+   def _remove_file( self, file_path ):
+      
+      try:
+         os.unlink( file_path )
+      except:
+         self.logger.warn(
+            'File missing, removing from inventory: {}'.format( file_path )
+         )
+      # Remove this file from the database.
+      self.database.execute(
+         'DELETE FROM files_installed WHERE file_path=?',
+         (file_path,)
+      )
+      self.logger.info( 'Removed file: {}'.format( file_path ) )
 
    def import_mod( self, mod_path ):
 
@@ -195,7 +219,7 @@ class DataDir( object ):
          if not file_path.startswith( mod_data_path ):
             continue
             
-         # TODO: Skip readme files.
+         # Skip readme files.
          if os.path.basename( file_path ).lower() in DATA_README_FILES:
             continue
 
@@ -234,18 +258,6 @@ class DataDir( object ):
          (mod_filename,)
       )
       for file_path in db_mods.fetchall():
-         file_path = file_path[0]
-         try:
-            os.unlink( file_path )
-         except:
-            self.logger.warn(
-               'File missing, removing from inventory: {}'.format( file_path )
-            )
-         self.database.execute(
-            'DELETE FROM files_installed WHERE file_path=?',
-            (file_path,)
-         )
-         self.logger.info( 'Removed file: {}'.format( file_path ) )
-
+         self._remove_file( file_path[0] )
       self.database.commit()
 
