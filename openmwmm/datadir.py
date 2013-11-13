@@ -139,6 +139,8 @@ class DataDir( object ):
          (mod_id, install_path, 'NA')
       )
 
+      self.logger.info( 'Installed file: {}'.format( install_path ) )
+
       # TODO: Actually extract the file.
 
    def import_mod( self, mod_path ):
@@ -166,7 +168,15 @@ class DataDir( object ):
       return mods_out
 
    def list_installed( self ):
-      pass
+
+      db_mods = self.database.execute(
+         'SELECT mod_name FROM files_installed GROUP BY mod_name'
+      )
+      #mods_out = []
+      #while mod = db_mods.fetchone():
+      #   mods_out.append( mod )
+      # TODO: Clean list on datadir side so it's not tuples.
+      return db_mods.fetchall()
 
    def install_mod( self, mod_filename, force=False ):
 
@@ -198,7 +208,7 @@ class DataDir( object ):
          )
          db_file = self.database.execute(
             'SELECT file_path FROM files_installed WHERE file_path=?',
-            [(install_path)]
+            (install_path,)
          )
          if db_file.fetchone():
             
@@ -215,5 +225,27 @@ class DataDir( object ):
       # TODO: Perform the actual installation in the second pass.
       for file_path in files_install:
          self._install_file( archive, file_path, mod_filename, mod_data_path )
+      self.database.commit()
+
+   def remove_mod( self, mod_filename ):
+
+      db_mods = self.database.execute(
+         'SELECT file_path FROM files_installed WHERE mod_name=?',
+         (mod_filename,)
+      )
+      for file_path in db_mods.fetchall():
+         file_path = file_path[0]
+         try:
+            os.unlink( file_path )
+         except:
+            self.logger.warn(
+               'File missing, removing from inventory: {}'.format( file_path )
+            )
+         self.database.execute(
+            'DELETE FROM files_installed WHERE file_path=?',
+            (file_path,)
+         )
+         self.logger.info( 'Removed file: {}'.format( file_path ) )
+
       self.database.commit()
 

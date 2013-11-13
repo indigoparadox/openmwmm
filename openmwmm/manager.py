@@ -64,6 +64,10 @@ class Manager( object ):
       installm.connect( 'activate', self.on_install )
       modmenu.append( installm )
 
+      removem = gtk.MenuItem( 'Remove...' )
+      removem.connect( 'activate', self.on_remove )
+      modmenu.append( removem )
+
       mb.append( modm )
 
       # Create the available mods list.
@@ -115,6 +119,18 @@ class Manager( object ):
          list_item.show()
          self.mods_available.add( list_item )
 
+      for mod in self.datadir.list_installed():
+         # Create and add the listbox item.
+         # TODO: Clean list on datadir side so it's not tuples.
+         label = gtk.Label( mod[0] )
+         label.set_alignment( 0, 0.5 )
+         label.show()
+         list_item = gtk.ListItem()
+         list_item.add( label )
+         list_item.set_data( 'mod', mod[0] )
+         list_item.show()
+         self.mods_installed.add( list_item )
+
    def on_import( self, widget ):
 
       # TODO: Display import dialog.
@@ -150,6 +166,19 @@ class Manager( object ):
 
       for item in self.mods_available.get_selection():
          mod = item.get_data( 'mod' )
-         self.logger.debug( 'Selected mod: {}'.format( mod ) )
+         self.logger.debug( 'Install selected mod: {}'.format( mod ) )
          self.datadir.install_mod( mod )
+
+      # Refresh.
+      self.show_mods()
+
+   def on_remove( self, widget ):
+
+      for item in self.mods_installed.get_selection():
+         mod = item.get_data( 'mod' )
+         self.logger.debug( 'Remove selected mod: {}'.format( mod ) )
+         self.datadir.remove_mod( mod )
+
+      # Refresh.
+      self.show_mods()
 
