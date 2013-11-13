@@ -23,7 +23,7 @@ from distutils.core import setup
 # TODO: Make an XDG desktop definition.
 
 setup(
-   name='pynotewiki',
+   name='openmwmm',
    # TODO: Figure out a way to grab the repo revision or something.
    version='0.1',
    packages=['openmwmm'],
