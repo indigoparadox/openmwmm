@@ -20,6 +20,12 @@ import logging
 import os
 import shutil
 import sqlite3
+import zipfile
+import rarfile
+import re
+
+DATA_README_FILES = ['readme']
+DATA_DIR_VERSION = '1'
 
 class DataDir( object ):
 
@@ -57,9 +63,83 @@ class DataDir( object ):
    def _setup_database( self ):
       self.database.execute( 'CREATE TABLE system (key text, value text)' )
       self.database.execute(
-         '''CREATE TABLE files_installed
-         (mod_hash text, file_path text, ins_date text)'''
+         'CREATE TABLE files_installed (' + \
+            'mod_name text collate nocase, ' + \
+            'file_path text collate nocase, ' + \
+            'ins_date text' + \
+         ')'
       )
+      self.database.execute(
+         'CREATE INDEX file_path_index ON files_installed ' + \
+            '(file_path collate nocase)'
+      )
+      self.database.execute(
+         'INSERT INTO system VALUES (?, ?)', ('version', DATA_DIR_VERSION)
+      )
+      self.database.commit()
+
+      # TODO: Set current version in system table.
+
+   def _open_archive( self, archive_path ):
+      
+      # TODO: Support ZIP, RAR, 7-ZIP.
+
+      try:
+         return zipfile.ZipFile( archive_path )
+      except:
+         pass
+      try:
+         return rarfile.RarFile( archive_path )
+      except Exception, e:
+         self.logger.error(
+            'Unable to open archive: {}'.format( archive_path )
+         )
+         self.logger.error( e.message )
+
+   def _list_archive( self, archive_file ):
+      list_out = []
+      for item in archive_file.namelist():
+         list_out.append( item.replace( '\\', '/' ) )
+      return list_out
+
+   def _find_data_archive( self, archive_file ):
+
+      data_prefix = ''
+      data_re = re.compile( r'^.*(/)?[Dd][Aa][Tt][Aa]' )
+      for path in self._list_archive( archive_file ):
+
+         # Try breaking stuff off until we find data/.
+         path_split = os.path.split( path )
+         while not path_split[0].lower().endswith( 'data' ):
+            path_split = os.path.split( path_split[0] )
+            if '' == path_split[0]:
+               break
+
+         # Make sure the name isn't something like foo_data.
+         if data_re.search( path_split[0] ):
+            data_prefix = path_split[0]
+
+      return data_prefix
+
+   def _remove_file( self, file_path, mod_id ):
+      
+      # TODO: Remove this file from the database.
+
+      pass
+
+   def _install_file( self, archive, file_path, mod_id, mod_data_path ):
+
+      install_path = os.path.join(
+         self.path_data, file_path[len( mod_data_path ) + 1:]
+      )
+      
+      # Log the installation of this file in the database.
+      self.database.execute(
+         'INSERT INTO files_installed VALUES (?, ?, ?)',
+         (mod_id, install_path, 'NA')
+      )
+
+      # TODO: Actually extract the file.
 
    def import_mod( self, mod_path ):
 
@@ -85,24 +165,55 @@ class DataDir( object ):
             mods_out.append( entry )
       return mods_out
 
-   def remove_file( self, mod_id, path_rel_data ):
-      
-      # TODO: Remove this file from the database.
-
+   def list_installed( self ):
       pass
 
-   def install_file( self, mod_id, path_rel_data, path_rel_arc, arcz ):
-      
-      # TODO: Log the installation of this file in the database.
+   def install_mod( self, mod_filename, force=False ):
 
-      pass
+      mod_path = os.path.join( self.path_avail, mod_filename )
 
-   def install_mod( self, mod_path, force=False ):
-      
-      # TODO: For each file in the archive, check if it exists in the database
-      #       and ask to remove existing copy if it does.
+      if not self.validate_mod( mod_path ):
+         raise Exception( 'Mod is not valid.' )
+
+      # Iterate through all files in the archive.
+      archive = self._open_archive( mod_path )
+      mod_data_path = self._find_data_archive( archive )
+      files_install = []
+      for file_path in self._list_archive( archive ):
+         
+         # Skip stuff outside data/.
+         if not file_path.startswith( mod_data_path ):
+            continue
+            
+         # TODO: Skip readme files.
+         if os.path.basename( file_path ).lower() in DATA_README_FILES:
+            continue
+
+         # TODO: For each file in the archive, check if it exists in the
+         #       database and ask to remove existing copy if it does. For the
+         #       database check, convert both filenames to caps to compare.
+
+         install_path = os.path.join(
+            self.path_data, file_path[len( mod_data_path ) + 1:]
+         )
+         db_file = self.database.execute(
+            'SELECT file_path FROM files_installed WHERE file_path=?',
+            [(install_path)]
+         )
+         if db_file.fetchone():
+            
+            # TODO: Ask what to do.
+
+            self.logger.warning(
+               'File already present, not installing: {}'.format( install_path )
+            )
+
+            continue
+
+         files_install.append( file_path )
 
       # TODO: Perform the actual installation in the second pass.
-
-      pass
+      for file_path in files_install:
+         self._install_file( archive, file_path, mod_filename, mod_data_path )
+      self.database.commit()
 

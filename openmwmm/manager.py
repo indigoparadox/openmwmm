@@ -26,7 +26,7 @@ class Manager( object ):
    window = None
    logger = None
    datadir = None
-   mods_avail = None
+   mods_available = None
    mods_installed = None
 
    def __init__( self ):
@@ -54,6 +54,17 @@ class Manager( object ):
       filemenu.append( exitm )
 
       mb.append( filem )
+
+      # Create a mod menu.
+      modmenu = gtk.Menu()
+      modm = gtk.MenuItem( 'Mod' )
+      modm.set_submenu( modmenu )
+
+      installm = gtk.MenuItem( 'Install...' )
+      installm.connect( 'activate', self.on_install )
+      modmenu.append( installm )
+
+      mb.append( modm )
 
       # Create the available mods list.
       self.mods_available = gtk.List()
@@ -134,4 +145,11 @@ class Manager( object ):
          self.logger.error( 'Unable to import mod: {}'.format( e.message ) )
       finally:     
          dialog.destroy()
+
+   def on_install( self, widget ):
+
+      for item in self.mods_available.get_selection():
+         mod = item.get_data( 'mod' )
+         self.logger.debug( 'Selected mod: {}'.format( mod ) )
+         self.datadir.install_mod( mod )
 
