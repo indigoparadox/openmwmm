@@ -17,9 +17,13 @@ You should have received a copy of the GNU General Public License along
 with OpenMWMM.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
+import logging
 import openmwmm.manager
 
 def main():
+
+   logging.basicConfig( level=logging.DEBUG )
+
    openmwmm.manager.Manager()
 
 if '__main__' == __name__:
