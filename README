@@ -1,0 +1,5 @@
+
+= Requirements =
+* dev-python/rarfile (https://pypi.python.org/pypi/rarfile)
+* Python with sqlite3 support.
+
