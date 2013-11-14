@@ -24,6 +24,7 @@ import zipfile
 import rarfile
 import re
 import tempfile
+import subprocess
 
 DATA_README_FILES = ['readme']
 DATA_DIR_VERSION = '1'
@@ -79,12 +80,8 @@ class DataDir( object ):
       )
       self.database.commit()
 
-      # TODO: Set current version in system table.
-
    def _open_archive( self, archive_path ):
       
-      # TODO: Support ZIP, RAR, 7-ZIP.
-
       try:
          return zipfile.ZipFile( archive_path )
       except:
@@ -120,7 +117,10 @@ class DataDir( object ):
          if data_re.search( path_split[0] ):
             data_prefix = path_split[0]
 
-      return data_prefix
+      if '' != data_prefix:
+         return data_prefix
+      else:
+         return None
 
    def _install_file( self, archive, file_path, mod_id, mod_data_path ):
 
@@ -168,6 +168,41 @@ class DataDir( object ):
       self.logger.info( 'Removed file: {}'.format( file_path ) )
 
    def import_mod( self, mod_path ):
+      
+      # This is hacky, but try to recompress 7zip files in a format we can
+      # read.
+      mod_filename, mod_extension = os.path.splitext( mod_path )
+      mod_filename = os.path.basename( mod_filename )
+      if '.7z' == mod_extension:
+         # Extract the archive somewhere temporary.
+         temp_dir = tempfile.mkdtemp()
+         temp_ex_path = os.path.join( temp_dir, mod_filename )
+         extract_command = [
+            '7z',
+            'x',
+            '-o{}'.format( temp_ex_path ),
+            mod_path
+         ]
+         print extract_command
+         subprocess.call( extract_command )
+
+         # 7z archives often contain a "Data Files" directory.
+         # TODO: Others can contain one, too! Go after them as well!
+         for root, dir_names, file_names in os.walk( temp_ex_path ):
+            for dir_name in dir_names:
+               if 'Data Files' == dir_name:
+                  os.rename(
+                     os.path.join( root, dir_name ),
+                     os.path.join( root, 'data' )
+                  )
+
+         mod_path = os.path.join( temp_dir, '{}.zip'.format( mod_filename ) )
+         with zipfile.ZipFile( mod_path, 'w' ) as zip_file:
+            for root, dir_names, file_names in os.walk( temp_ex_path ):
+               for file_name in file_names:
+                  zip_file.write( os.path.join( root, file_name ) )
+
+         # TODO: Remove temporary directory.
 
       if not self.validate_mod( mod_path ):
          raise Exception( 'Mod is not valid.' )
@@ -177,8 +212,13 @@ class DataDir( object ):
 
    def validate_mod( self, mod_path ):
       
-      # TODO: Open mod archive and try to find data directory.
-
+      # Open mod archive and try to find data directory.
+      try:
+         mod = self._open_archive( mod_path )
+      except:
+         return False
+      if not self._find_data_archive( mod ):
+         return False
       return True
 
    def list_available( self ):
@@ -223,10 +263,8 @@ class DataDir( object ):
          if os.path.basename( file_path ).lower() in DATA_README_FILES:
             continue
 
-         # TODO: For each file in the archive, check if it exists in the
-         #       database and ask to remove existing copy if it does. For the
-         #       database check, convert both filenames to caps to compare.
-
+         # For each file in the archive, check if it exists in the database and
+         # ask to remove existing copy if it does.
          install_path = os.path.join(
             self.path_data, file_path[len( mod_data_path ) + 1:]
          )
@@ -246,7 +284,7 @@ class DataDir( object ):
 
          files_install.append( file_path )
 
-      # TODO: Perform the actual installation in the second pass.
+      # Perform the actual installation in the second pass.
       for file_path in files_install:
          self._install_file( archive, file_path, mod_filename, mod_data_path )
       self.database.commit()
