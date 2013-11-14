@@ -149,6 +149,7 @@ class Manager( object ):
       modfilter.set_name( 'Morrowind Mod' )
       modfilter.add_pattern( '*.zip' )
       modfilter.add_pattern( '*.rar' )
+      modfilter.add_pattern( '*.7z' )
       dialog.add_filter( modfilter )
 
       # Perform the actual import.
@@ -167,6 +168,7 @@ class Manager( object ):
       for item in self.mods_available.get_selection():
          mod = item.get_data( 'mod' )
          self.logger.debug( 'Install selected mod: {}'.format( mod ) )
+         # TODO: Error dialog on failure.
          self.datadir.install_mod( mod )
 
       # Refresh.
