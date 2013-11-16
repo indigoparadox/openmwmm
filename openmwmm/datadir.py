@@ -29,6 +29,12 @@ import subprocess
 DATA_README_FILES = ['readme']
 DATA_DIR_VERSION = '1'
 
+class InvalidModException( Exception ):
+   pass
+
+class NoDataDirException( Exception ):
+   pass
+
 class DataDir( object ):
 
    logger = None
@@ -124,9 +130,13 @@ class DataDir( object ):
 
    def _install_file( self, archive, file_path, mod_id, mod_data_path ):
 
-      install_path = os.path.join(
-         self.path_data, file_path[len( mod_data_path ) + 1:]
-      )
+      # Handle no-datadir scenarios.
+      if mod_data_path:
+         install_path = os.path.join(
+            self.path_data, file_path[len( mod_data_path ) + 1:]
+         )
+      else:
+         install_path = os.path.join( self.path_data, file_path )
 
       try:
          os.makedirs( os.path.dirname( install_path ) )
@@ -138,10 +148,10 @@ class DataDir( object ):
          with archive.open( file_path ) as file_file:
             with open( install_path, 'wb' ) as out_file:
                shutil.copyfileobj( file_file, out_file )
-      except:
-         self.logger.error(
-            'Failed to install file: {}'.format( install_path )
-         )
+      except Exception, e:
+         self.logger.error( 'Failed to install file "{}": {}'.format(
+            install_path, e
+         ) )
          return
 
       # Log the installation of this file in the database.
@@ -167,7 +177,7 @@ class DataDir( object ):
       )
       self.logger.info( 'Removed file: {}'.format( file_path ) )
 
-   def import_mod( self, mod_path ):
+   def import_mod( self, mod_path, nodatadir=False ):
       
       # This is hacky, but try to recompress 7zip files in a format we can
       # read.
@@ -205,7 +215,13 @@ class DataDir( object ):
          # TODO: Remove temporary directory.
 
       if not self.validate_mod( mod_path ):
-         raise Exception( 'Mod is not valid.' )
+         raise InvalidModException( 'Mod is not valid.' )
+
+      # If we're supposed to have a data dir, then make sure we have one.
+      if not nodatadir:
+         with self._open_archive( mod_path ) as mod:
+            if not self._find_data_archive( mod ):
+               raise NoDataDirException( 'Mod is missing data dir.' )
 
       # Copy mod to data avail path.
       shutil.copy( mod_path, self.path_avail )
@@ -215,10 +231,12 @@ class DataDir( object ):
       # Open mod archive and try to find data directory.
       try:
          mod = self._open_archive( mod_path )
+         mod.close()
       except:
          return False
-      if not self._find_data_archive( mod ):
-         return False
+      # Sometimes mods are valid without a data directory.
+      #if not self._find_data_archive( mod ):
+      #   return False
       return True
 
    def list_available( self ):
@@ -247,11 +265,13 @@ class DataDir( object ):
       mod_path = os.path.join( self.path_avail, mod_filename )
 
       if not self.validate_mod( mod_path ):
-         raise Exception( 'Mod is not valid.' )
+         raise InvalidModException( 'Mod is not valid.' )
 
       # Iterate through all files in the archive.
       archive = self._open_archive( mod_path )
       mod_data_path = self._find_data_archive( archive )
+      if not mod_data_path:
+         mod_data_path = ''
       files_install = []
       for file_path in self._list_archive( archive ):
          

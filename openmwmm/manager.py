@@ -20,6 +20,7 @@ import gtk
 import logging
 import os
 import openmwmm.datadir
+import openmwmm.dialogs
 
 class Manager( object ):
 
@@ -159,10 +160,19 @@ class Manager( object ):
          if gtk.RESPONSE_OK == response:
             self.datadir.import_mod( dialog.get_filename() )
             self.show_mods()
-      except Exception, e:
+      except openmwmm.datadir.NoDataDirException, e:
+         self.logger.warn( 'Mod missing data dir: {}'.format(
+            dialog.get_filename()
+         ) )
+         if openmwmm.dialogs.NoDataDirDialog( self.window ).run():
+            self.datadir.import_mod( dialog.get_filename(), True )
+      except openmwmm.datadir.InvalidModException, e:
          self.logger.error( 'Unable to import mod: {}'.format( e.message ) )
       finally:     
          dialog.destroy()
+
+      # Refresh.
+      self.show_mods()
 
    def on_install( self, widget ):
 

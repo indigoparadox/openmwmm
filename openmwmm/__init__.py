@@ -1,3 +1,3 @@
 
-__all__ = ['manager','datadir']
+__all__ = ['manager','datadir','dialogs']
 
