@@ -123,13 +123,12 @@ class Manager( object ):
 
       for mod in self.datadir.list_installed():
          # Create and add the listbox item.
-         # TODO: Clean list on datadir side so it's not tuples.
-         label = gtk.Label( mod[0] )
+         label = gtk.Label( mod )
          label.set_alignment( 0, 0.5 )
          label.show()
          list_item = gtk.ListItem()
          list_item.add( label )
-         list_item.set_data( 'mod', mod[0] )
+         list_item.set_data( 'mod', mod )
          list_item.show()
          self.mods_installed.add( list_item )
 

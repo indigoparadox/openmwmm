@@ -247,6 +247,7 @@ class DataDir( object ):
       for entry in os.listdir( self.path_avail ):
          if self.validate_mod( os.path.join( self.path_avail, entry ) ):
             mods_out.append( entry )
+      mods_out.sort()
       return mods_out
 
    def list_installed( self ):
@@ -254,11 +255,14 @@ class DataDir( object ):
       db_mods = self.database.execute(
          'SELECT mod_name FROM files_installed GROUP BY mod_name'
       )
-      #mods_out = []
-      #while mod = db_mods.fetchone():
-      #   mods_out.append( mod )
-      # TODO: Clean list on datadir side so it's not tuples.
-      return db_mods.fetchall()
+
+      # Clean list on datadir side so it's not tuples.
+      mods_out = []
+      for mod in db_mods.fetchall():
+         mods_out.append( mod[0] )
+
+      mods_out.sort()
+      return mods_out
 
    def install_mod( self, mod_filename, force=False ):
 
