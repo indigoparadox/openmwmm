@@ -72,6 +72,7 @@ class Manager( object ):
 
       # Create the available mods list.
       self.mods_available = gtk.List()
+      self.mods_available.connect( 'selection_changed', self.on_mod_selection )
       mods_available_scroller = gtk.ScrolledWindow()
       mods_available_scroller.props.vscrollbar_policy = gtk.POLICY_AUTOMATIC
       mods_available_scroller.add_with_viewport( self.mods_available )
@@ -183,4 +184,16 @@ class Manager( object ):
 
       # Refresh.
       self.show_mods()
+
+   def on_mod_selection( self, widget ):
+      selection = widget.get_selection()
+      
+      if not selection:
+         return
+
+      # Load the selection text into the editor.
+      for item in selection:
+         contents = item.get_data( 'mod' )
+
+         # TODO: Show the mod readme in a viewer pane.
 
